@@ -1,13 +1,58 @@
-from intercom import Intercom
+import sounddevice as sd                                                        # https://python-sounddevice.readthedocs.io
+import numpy                                                                    # https://numpy.org/
+import socket                                                                   # https://docs.python.org/3/library/socket.html
+import sys
+import intercom as inte
 
-class Intercom_buffer(Intercom):
+class IntercomBuffer(inte.Intercom):
 
     def init(self, args):
-        Intercom.init(self, args)
+        inte.Intercom.init(self, args)
+        self.chunk_to_play = 0
 
+    def run(self):
+        sending_sock = socket.socket(socket.AF_INET, socket.SOCK_DGRAM)
+        receiving_sock = socket.socket(socket.AF_INET, socket.SOCK_DGRAM)
+        listening_endpoint = ("0.0.0.0", self.listening_port)
+        receiving_sock.bind(listening_endpoint)
+
+        capacity = int(input("Specify the buffer size: "))
+        lista = [numpy.zeros((self.samples_per_chunk, self.number_of_channels), self.dtype)]*capacity
+
+        def receive_and_buffer():
+            array, source_address = receiving_sock.recvfrom(self.max_packet_size)
+            array = numpy.frombuffer(array, dtype=self.dtype)  
+
+            pos = int(array[0]) % capacity
+            array = numpy.delete(array, 0)
+        
+            lista[pos] = array
+        
+        def record_send_and_play (indata, outdata, frames, time, status):
+            array = numpy.frombuffer(indata, dtype=self.dtype)
+            array = numpy.insert(array, 0, self.chunk_to_play)
+
+            message = lista[self.chunk_to_play % capacity]                                          
+            lista[self.chunk_to_play % capacity] = numpy.zeros((self.samples_per_chunk, self.number_of_channels), dtype=self.dtype)
+            self.chunk_to_play = (self.chunk_to_play + 1) % capacity
+
+            sending_sock.sendto(array, (self.destination_IP_addr, self.destination_port))
+
+            outdata[:] = numpy.frombuffer(message,dtype=self.dtype).reshape(self.samples_per_chunk, self.number_of_channels)
+
+            sys.stderr.write("."); sys.stderr.flush()
+
+        with sd.Stream(
+                samplerate=self.samples_per_second,
+                blocksize=self.samples_per_chunk,
+                dtype=self.dtype,
+                channels=self.number_of_channels,
+                callback=record_send_and_play):
+            while True:
+                receive_and_buffer()
 
 if __name__ == "__main__":
-    intercom = Intercom_buffer()
+    intercom = IntercomBuffer()
     parser = intercom.add_args()
     args = parser.parse_args()
     intercom.init(args)
