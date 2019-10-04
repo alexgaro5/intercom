@@ -2,12 +2,12 @@ import sounddevice as sd                                                        
 import numpy                                                                    # https://numpy.org/
 import socket                                                                   # https://docs.python.org/3/library/socket.html
 import sys
-import intercom as inte
+from intercom import Intercom
 
-class IntercomBuffer(inte.Intercom):
+class IntercomBuffer(Intercom):
 
     def init(self, args):
-        inte.Intercom.init(self, args)
+        Intercom.init(self, args)
         self.chunk_to_play = 0
 
     def run(self):
