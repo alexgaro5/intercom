@@ -83,6 +83,7 @@ class Intercom:
         parser.add_argument("-p", "--mlp", help="My listening port.", type=int, default=4444)
         parser.add_argument("-i", "--ilp", help="Interlocutor's listening port.", type=int, default=4444)
         parser.add_argument("-a", "--ia", help="Interlocutor's IP address or name.", type=str, default="localhost")
+        parser.add_argument("-b", "--buffer_capacity", help="Buffer capacity.", type=int, default=4)
         return parser
 
 if __name__ == "__main__":
