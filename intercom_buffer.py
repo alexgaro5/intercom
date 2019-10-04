@@ -16,14 +16,13 @@ class IntercomBuffer(Intercom):
         listening_endpoint = ("0.0.0.0", self.listening_port)
         receiving_sock.bind(listening_endpoint)
 
-        capacity = int(input("Specify the buffer size: "))
-        lista = [numpy.zeros((self.samples_per_chunk, self.number_of_channels), self.dtype)]*capacity
+        lista = [numpy.zeros((self.samples_per_chunk, self.number_of_channels), self.dtype)]*self.buffer_capacity
 
         def receive_and_buffer():
             array, source_address = receiving_sock.recvfrom(self.max_packet_size)
             array = numpy.frombuffer(array, dtype=self.dtype)  
 
-            pos = int(array[0]) % capacity
+            pos = int(array[0]) % self.buffer_capacity
             array = numpy.delete(array, 0)
         
             lista[pos] = array
@@ -32,9 +31,9 @@ class IntercomBuffer(Intercom):
             array = numpy.frombuffer(indata, dtype=self.dtype)
             array = numpy.insert(array, 0, self.chunk_to_play)
 
-            message = lista[self.chunk_to_play % capacity]                                          
-            lista[self.chunk_to_play % capacity] = numpy.zeros((self.samples_per_chunk, self.number_of_channels), dtype=self.dtype)
-            self.chunk_to_play = (self.chunk_to_play + 1) % capacity
+            message = lista[self.chunk_to_play % self.buffer_capacity]                                          
+            lista[self.chunk_to_play % self.buffer_capacity] = numpy.zeros((self.samples_per_chunk, self.number_of_channels), dtype=self.dtype)
+            self.chunk_to_play = (self.chunk_to_play + 1) % self.buffer_capacity
 
             sending_sock.sendto(array, (self.destination_IP_addr, self.destination_port))
 

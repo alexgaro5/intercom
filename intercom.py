@@ -28,6 +28,7 @@ class Intercom:
         self.listening_port = args.mlp
         self.destination_IP_addr = args.ia
         self.destination_port = args.ilp
+        self.buffer_capacity = args.buffer_capacity
 
         if __debug__:
             print("bytes_per_sample={}".format(self.bytes_per_sample))
@@ -37,6 +38,7 @@ class Intercom:
             print("listening_port={}".format(self.listening_port))
             print("destination_IP_address={}".format(self.destination_IP_addr))
             print("destination_port={}".format(self.destination_port))
+            print("buffer_capacity={}".format(self.buffer_capacity))
 
         if self.bytes_per_sample == 1:
             self.dtype = numpy.int8
@@ -83,7 +85,7 @@ class Intercom:
         parser.add_argument("-p", "--mlp", help="My listening port.", type=int, default=4444)
         parser.add_argument("-i", "--ilp", help="Interlocutor's listening port.", type=int, default=4444)
         parser.add_argument("-a", "--ia", help="Interlocutor's IP address or name.", type=str, default="localhost")
-        parser.add_argument("-b", "--buffer_capacity", help="Buffer capacity.", type=int, default=4)
+        parser.add_argument("-bc", "--buffer_capacity", help="Buffer capacity.", type=int, default=4)
         return parser
 
 if __name__ == "__main__":
