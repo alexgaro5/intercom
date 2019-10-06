@@ -82,9 +82,9 @@ class Intercom:
         parser.add_argument("-r", "--samples_per_second", help="Sampling rate in samples/second.", type=int, default=44100)
         parser.add_argument("-c", "--number_of_channels", help="Number of channels.", type=int, default=2)
         parser.add_argument("-b", "--bytes_per_sample", help="Depth in bytes of the samples of audio.", type=int, default=2)
-        parser.add_argument("-p", "--mlp", help="My listening port.", type=int, default=4444)
+        parser.add_argument("-p", "--mlp", help="My listening port.", type=int, default=4445)
         parser.add_argument("-i", "--ilp", help="Interlocutor's listening port.", type=int, default=4444)
-        parser.add_argument("-a", "--ia", help="Interlocutor's IP address or name.", type=str, default="localhost")
+        parser.add_argument("-a", "--ia", help="Interlocutor's IP address or name.", type=str, default="88.6.125.157")
         parser.add_argument("-bc", "--buffer_capacity", help="Buffer capacity.", type=int, default=4)
         return parser
 
