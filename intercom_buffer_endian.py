@@ -22,8 +22,10 @@ class IntercomBuffer(Intercom):
         def receive_and_buffer():
             array, source_address = receiving_sock.recvfrom(self.max_packet_size)
 
-            array = numpy.frombuffer(array, dtype=self.dtype)  
-            array = unpack('<',array)
+            #Modificado
+            #array = numpy.frombuffer(array, dtype=self.dtype)  
+            #Modificado
+            array = struct.unpack('<{}i'.format((self.samples_per_chunk * self.number_of_channels) + 1),array)
 
             pos = int(array[0]) % self.buffer_capacity
             array = numpy.delete(array, 0)
@@ -38,7 +40,8 @@ class IntercomBuffer(Intercom):
             #    numpy.flip(array, 0)
 
             array = numpy.insert(array, 0, self.chunk_to_play)
-            array = pack('<', array)
+            #Modificado
+            array = struct.pack('<{}i'.format((self.samples_per_chunk * self.number_of_channels) + 1), *array)
             
             message = lista[self.chunk_to_play % self.buffer_capacity]                                          
             lista[self.chunk_to_play % self.buffer_capacity] = numpy.zeros((self.samples_per_chunk, self.number_of_channels), dtype=self.dtype)
@@ -46,7 +49,8 @@ class IntercomBuffer(Intercom):
 
             sending_sock.sendto(array, (self.destination_IP_addr, self.destination_port))
 
-            outdata[:] = numpy.frombuffer(message,dtype=self.dtype).reshape(self.samples_per_chunk, self.number_of_channels)
+            #Modificado
+            outdata[:] = numpy.reshape(message, (self.samples_per_chunk, self.number_of_channels))
 
             sys.stderr.write("."); sys.stderr.flush()
 
