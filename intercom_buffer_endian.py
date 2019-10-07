@@ -10,6 +10,7 @@ class IntercomBuffer(Intercom):
     def init(self, args):
         Intercom.init(self, args)
         self.chunk_to_play = 0
+        self.delay = self.buffer_capacity // 2
 
     def run(self):
         sending_sock = socket.socket(socket.AF_INET, socket.SOCK_DGRAM)
@@ -26,7 +27,7 @@ class IntercomBuffer(Intercom):
             pos = 0
             pos, *array = struct.unpack('<H{}h'.format(self.samples_per_chunk * self.number_of_channels), message)
 
-            lista[pos] = array
+            lista[(pos + self.delay) % self.buffer_capacity] = array
         
         def record_send_and_play (indata, outdata, frames, time, status):
             array = numpy.frombuffer(indata, dtype=self.dtype)
