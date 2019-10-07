@@ -24,7 +24,7 @@ class IntercomBuffer(Intercom):
 
             array = struct.unpack('<H{}h'.format(self.samples_per_chunk * self.number_of_channels),array)
 
-            pos = int(array[0]) % self.buffer_capacity
+            pos = int(array[0])
             array = numpy.delete(array, 0)
         
             lista[pos] = array
@@ -32,11 +32,10 @@ class IntercomBuffer(Intercom):
         def record_send_and_play (indata, outdata, frames, time, status):
             array = numpy.frombuffer(indata, dtype=self.dtype)
             
-            array = numpy.insert(array, 0, self.chunk_to_play)
-            array = struct.pack('<H{}h'.format(self.samples_per_chunk * self.number_of_channels), *array)
+            array = struct.pack('<H{}h'.format(self.samples_per_chunk * self.number_of_channels), self.chunk_to_play,  *array)
             
-            message = lista[self.chunk_to_play % self.buffer_capacity]                                          
-            lista[self.chunk_to_play % self.buffer_capacity] = numpy.zeros((self.samples_per_chunk, self.number_of_channels), dtype=self.dtype)
+            message = lista[self.chunk_to_play]                                          
+            lista[self.chunk_to_play] = numpy.zeros((self.samples_per_chunk, self.number_of_channels), dtype=self.dtype)
             self.chunk_to_play = (self.chunk_to_play + 1) % self.buffer_capacity
 
             sending_sock.sendto(array, (self.destination_IP_addr, self.destination_port))
