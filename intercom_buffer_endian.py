@@ -22,12 +22,10 @@ class IntercomBuffer(Intercom):
         def receive_and_buffer():
             array, source_address = receiving_sock.recvfrom(self.max_packet_size)
 
-            array = struct.unpack('<H{}h'.format(self.samples_per_chunk * self.number_of_channels),array)
+            array = struct.unpack('<H{}h'.format(self.samples_per_chunk * self.number_of_channels), array)
 
             pos = int(array[0])
-            array = numpy.delete(array, 0)
-        
-            lista[pos] = array
+            lista[pos] = array[1:len(array)]
         
         def record_send_and_play (indata, outdata, frames, time, status):
             array = numpy.frombuffer(indata, dtype=self.dtype)
@@ -35,7 +33,6 @@ class IntercomBuffer(Intercom):
             array = struct.pack('<H{}h'.format(self.samples_per_chunk * self.number_of_channels), self.chunk_to_play,  *array)
             
             message = lista[self.chunk_to_play]                                          
-            lista[self.chunk_to_play] = numpy.zeros((self.samples_per_chunk, self.number_of_channels), dtype=self.dtype)
             self.chunk_to_play = (self.chunk_to_play + 1) % self.buffer_capacity
 
             sending_sock.sendto(array, (self.destination_IP_addr, self.destination_port))
