@@ -20,12 +20,13 @@ class IntercomBuffer(Intercom):
         lista = [numpy.zeros((self.samples_per_chunk, self.number_of_channels), self.dtype)]*self.buffer_capacity
 
         def receive_and_buffer():
-            array, source_address = receiving_sock.recvfrom(self.max_packet_size)
+            message, source_address = receiving_sock.recvfrom(self.max_packet_size)
 
-            array = struct.unpack('<H{}h'.format(self.samples_per_chunk * self.number_of_channels), array)
+            array = []
+            pos = 0
+            pos, *array = struct.unpack('<H{}h'.format(self.samples_per_chunk * self.number_of_channels), message)
 
-            pos = int(array[0])
-            lista[pos] = array[1:len(array)]
+            lista[pos] = array
         
         def record_send_and_play (indata, outdata, frames, time, status):
             array = numpy.frombuffer(indata, dtype=self.dtype)
