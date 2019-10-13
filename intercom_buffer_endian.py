@@ -23,8 +23,6 @@ class IntercomBuffer(Intercom):
         def receive_and_buffer():
             message, source_address = receiving_sock.recvfrom(self.max_packet_size)
 
-            array = []
-            pos = 0
             pos, *array = struct.unpack('<H{}h'.format(self.samples_per_chunk * self.number_of_channels), message)
 
             lista[(pos + self.delay) % self.buffer_capacity] = array
