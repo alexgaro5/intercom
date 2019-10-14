@@ -11,7 +11,12 @@ class IntercomBuffer(Intercom):
     def init(self, args):
         Intercom.init(self, args)
         self.chunk_to_play = 0                                                  #This is the chunk we are going to play
+        self.buffer_capacity = args.buffer_capacity
         self.delay = self.buffer_capacity // 2                                  #This is the delay we are using before playing the chunks
+        self.pos = 0
+
+        if __debug__:
+            print("buffer_capacity={}".format(self.buffer_capacity))
 
     def run(self):
         sending_sock = socket.socket(socket.AF_INET, socket.SOCK_DGRAM)
@@ -24,16 +29,16 @@ class IntercomBuffer(Intercom):
         def receive_and_buffer():
             package, source_address = receiving_sock.recvfrom(self.max_packet_size)                                 #We recieve the message via UDP
 
-            pos, *message = struct.unpack('<H{}h'.format(self.samples_per_chunk * self.number_of_channels), package)  #Unpacking the message recieved 
+            self.pos, *message = struct.unpack('<H{}h'.format(self.samples_per_chunk * self.number_of_channels), package)  #Unpacking the message recieved 
 
-            lista[(pos + self.delay) % self.buffer_capacity] = message                                                 #Inserting the data audio in the buffer with the delay
+            lista[self.pos % self.buffer_capacity] = message                                                             #Inserting the data audio in the buffer with the delay
         
         def record_send_and_play (indata, outdata, frames, time, status):
-            array = numpy.frombuffer(indata, dtype=self.dtype)                                                      #Inserting indata into numpy array with the specified type
+            array = numpy.frombuffer(indata, dtype=self.dtype)                                                         #Inserting indata into numpy array with the specified type
             
             package = struct.pack('<H{}h'.format(self.samples_per_chunk * self.number_of_channels), self.chunk_to_play, *array)  #Packing the message to send
             
-            message = lista[self.chunk_to_play]                                                                      #Getting the message from the buffer                                     
+            message = lista[(self.delay + self.pos) % self.buffer_capacity]                                                        #Getting the message from the buffer                                     
             self.chunk_to_play = (self.chunk_to_play + 1) % self.buffer_capacity                                    #Incrementing the chunk_to_play
 
             sending_sock.sendto(package, (self.destination_IP_addr, self.destination_port))
@@ -50,6 +55,11 @@ class IntercomBuffer(Intercom):
                 callback=record_send_and_play):
             while True:
                 receive_and_buffer()
+
+    def add_args(self):
+        parser = Intercom.add_args(self)
+        parser.add_argument("-bc", "--buffer_capacity", help="Buffer capacity.", type=int, default=1000)
+        return parser
 
 if __name__ == "__main__":
     intercom = IntercomBuffer()
