@@ -24,19 +24,19 @@ class IntercomBuffer(Intercom):
         def receive_and_buffer():
             package, source_address = receiving_sock.recvfrom(self.max_packet_size)                                 #We recieve the message via UDP
 
-            pos, *array = struct.unpack('<H{}h'.format(self.samples_per_chunk * self.number_of_channels), package)  #Unpacking the message recieved 
+            pos, *message = struct.unpack('<H{}h'.format(self.samples_per_chunk * self.number_of_channels), package)  #Unpacking the message recieved 
 
-            list[(pos + self.delay) % self.buffer_capacity] = array                                                 #Inserting the data audio in the buffer with the delay
+            list[(pos + self.delay) % self.buffer_capacity] = message                                                 #Inserting the data audio in the buffer with the delay
         
         def record_send_and_play (indata, outdata, frames, time, status):
             array = numpy.frombuffer(indata, dtype=self.dtype)                                                      #Inserting indata into numpy array with the specified type
             
-            array = struct.pack('<H{}h'.format(self.samples_per_chunk * self.number_of_channels), self.chunk_to_play,  *array)  #Packing the message to send
+            package = struct.pack('<H{}h'.format(self.samples_per_chunk * self.number_of_channels), self.chunk_to_play, *array)  #Packing the message to send
             
             message = list[self.chunk_to_play]                                                                      #Getting the message from the buffer                                     
             self.chunk_to_play = (self.chunk_to_play + 1) % self.buffer_capacity                                    #Incrementing the chunk_to_play
 
-            sending_sock.sendto(array, (self.destination_IP_addr, self.destination_port))
+            sending_sock.sendto(package, (self.destination_IP_addr, self.destination_port))
 
             outdata[:] = numpy.reshape(message, (self.samples_per_chunk, self.number_of_channels))                  #Playing the audio recieved
 
