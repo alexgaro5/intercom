@@ -38,8 +38,9 @@ class IntercomBuffer(Intercom):
             
             package = struct.pack('<H{}h'.format(self.samples_per_chunk * self.number_of_channels), self.chunk_to_play, *array)  #Packing the message to send
 
+            print(self.pos)
             self.chunk_to_play = (self.pos + self.delay) % self.buffer_capacity            
-            message = lista[self.pos % self.buffer_capacity]                                                        #Getting the message from the buffer                                     
+            message = lista[self.chunk_to_play]                                                        #Getting the message from the buffer                                     
             #self.chunk_to_play = (self.chunk_to_play + 1) % self.buffer_capacity                                    #Incrementing the chunk_to_play
 
             sending_sock.sendto(package, (self.destination_IP_addr, self.destination_port))
