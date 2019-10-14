@@ -22,9 +22,9 @@ class IntercomBuffer(Intercom):
         list = [numpy.zeros((self.samples_per_chunk, self.number_of_channels), self.dtype)]*self.buffer_capacity    #Defining the structure of the buffer filled with 0
 
         def receive_and_buffer():
-            message, source_address = receiving_sock.recvfrom(self.max_packet_size)                                 #We recieve the message via UDP
+            package, source_address = receiving_sock.recvfrom(self.max_packet_size)                                 #We recieve the message via UDP
 
-            pos, *array = struct.unpack('<H{}h'.format(self.samples_per_chunk * self.number_of_channels), message)  #Unpacking the message recieved 
+            pos, *array = struct.unpack('<H{}h'.format(self.samples_per_chunk * self.number_of_channels), package)  #Unpacking the message recieved 
 
             list[(pos + self.delay) % self.buffer_capacity] = array                                                 #Inserting the data audio in the buffer with the delay
         
