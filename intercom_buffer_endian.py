@@ -1,22 +1,21 @@
 import sounddevice as sd                                                        # https://python-sounddevice.readthedocs.io
 import numpy                                                                    # https://numpy.org/
-import socket                                                                   # https://docs.python.org/3/library/socket.html
-import sys
 import struct
-from intercom import Intercom                                                   #Importing the original Intercom
+from intercom import Intercom                                                                                                                   #Importing the original Intercom
 if __debug__:
    import time
 
 class IntercomBuffer(Intercom):
 
-    #Redifining the init method
+    MAX_CHUNK_NUMBER = 65536
+
+                                                                                                                                                #Redifining the init method
     def init(self, args):
         Intercom.init(self, args)
-        self.chunk_to_play = 0                                                  #This is the chunk we are going to play
-        self.chunk_counter = 0
-        self.buffer_capacity = args.buffer_capacity
-        self.delay = self.buffer_capacity // 2 
-        self.pos = 0
+        self.chunks_to_buffer = args.chunks_to_buffer
+        self.cells_in_buffer = self.chunks_to_buffer * 2
+        self._buffer = [self.generate_zero_chunk()] * self.cells_in_buffer
+        self.packet_format = f"H{self.samples_per_chunk}h"
         self.chunk_time = (self.samples_per_chunk / self.samples_per_second)
         self.buffering_time = (self.chunk_time * self.delay)
 
@@ -26,50 +25,45 @@ class IntercomBuffer(Intercom):
             print("buffering time={}".format(self.buffering_time))
 
     def run(self):
-        sending_sock = socket.socket(socket.AF_INET, socket.SOCK_DGRAM)
-        receiving_sock = socket.socket(socket.AF_INET, socket.SOCK_DGRAM)
-        listening_endpoint = ("0.0.0.0", self.listening_port)
-        receiving_sock.bind(listening_endpoint)
 
-        lista = [numpy.zeros((self.samples_per_chunk, self.number_of_channels), self.dtype)]*self.buffer_capacity    #Defining the structure of the buffer filled with 0
+        self.recorded_chunk_number = 0
+        self.played_chunk_number = 0
 
         def receive_and_buffer():
-            package, source_address = receiving_sock.recvfrom(self.max_packet_size)                                 #We recieve the message via UDP
+            package, source_address = receiving_sock.recvfrom(Intercom.MAX_MESSAGE_SIZE)                                                        #We recieve the message via UDP
 
-            self.pos, *message = struct.unpack('<H{}h'.format(self.samples_per_chunk * self.number_of_channels), package)  #Unpacking the message recieved 
+            chunk_number, *message = struct.unpack(self.packet_format, package)                                                                 #Unpacking the message recieved 
 
-            lista[self.pos % self.buffer_capacity] = message                                                             #Inserting the data audio in the buffer with the delay
+            self._buffer[chunk_number % self.cells_in_buffer] = numpy.asarray(message).reshape(self.frames_per_chunk, self.number_of_channels)  #Inserting the data audio in the buffer
         
-        def record_send_and_play (indata, outdata, frames, time, status):
-            array = numpy.frombuffer(indata, dtype=self.dtype)                                                         #Inserting indata into numpy array with the specified type
-            
-            package = struct.pack('<H{}h'.format(self.samples_per_chunk * self.number_of_channels), self.chunk_counter, *array)  #Packing the message to send
-      
-            sending_sock.sendto(package, (self.destination_IP_addr, self.destination_port))
+        def record_send_and_play (indata, outdata, frames, time, status):                                                       
+            package = struct.pack(self.packet_format, self.recorded_chunk_number, *(indata.flatten()))                                          #Packing the message to send
+            self.recorded_chunk_number = (self.recorded_chunk_number + 1) % self.MAX_CHUNK_NUMBER                                               #Increase the index to record the chunk
 
-            message = lista[(self.pos + self.delay) % self.buffer_capacity]                                                        #Getting the message from the buffer                                     
-            self.chunk_counter = (self.chunk_counter + 1) % 65536                                                                  #Incrementing the chunk_to_play
+            self.sending_sock.sendto(package, (self.destination_IP_addr, self.destination_port))                                                #Send the message
 
-            outdata[:] = numpy.reshape(message, (self.samples_per_chunk, self.number_of_channels))                  #Playing the audio recieved
+            message = self._buffer[self.played_chunk_number % self.cells_in_buffer]                                                             #Getting the message from the buffer                                     
+            self._buffer[self.played_chunk_number % self.cells_in_buffer] = self.generate_zero_chunk()                                          #Put zeros in the index position where we take the previuos message
+            self.played_chunk_number = (self.played_chunk_number + 1) % self.cells_in_buffer                                                    #Increase the index to play the chunk
+
+            outdata[:] = message                                                                                                                #Playing the audio recieved
 
             sys.stderr.write("."); sys.stderr.flush()
 
-        with sd.Stream(
-                samplerate=self.samples_per_second,
-                blocksize=self.samples_per_chunk,
-                dtype=self.dtype,
-                channels=self.number_of_channels,
-                callback=record_send_and_play):
-            while True:
-                receive_and_buffer()
+    with sd.Stream(samplerate=self.frames_per_second, blocksize=self.frames_per_chunk, dtype=np.int16, channels=self.number_of_channels, callback=record_send_and_play):
+        print("-=- Press CTRL + c to quit -=-")
+        first_received_chunk_number = receive_and_buffer()
+        self.played_chunk_number = (first_received_chunk_number - self.chunks_to_buffer) % self.cells_in_buffer
+        while True:
+            receive_and_buffer()
 
     def add_args(self):
         parser = Intercom.add_args(self)
-        parser.add_argument("-bc", "--buffer_capacity", help="Buffer capacity.", type=int, default=100)
+        parser.add_argument("-cb", "--chunks_to_buffer", help="Number of chunks to buffer", type=int, default=32)
         return parser
 
 if __name__ == "__main__":
-    intercom = IntercomBuffer()
+    intercom = Intercom_buffer()
     parser = intercom.add_args()
     args = parser.parse_args()
     intercom.init(args)
