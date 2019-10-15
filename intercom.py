@@ -72,11 +72,7 @@ class Intercom:
         parser = argparse.ArgumentParser(description="Real-time intercom", formatter_class=argparse.ArgumentDefaultsHelpFormatter)
         parser.add_argument("-s", "--frames_per_chunk", help="Samples per chunk.", type=int, default=1024)
         parser.add_argument("-r", "--frames_per_second", help="Sampling rate in frames/second.", type=int, default=44100)
-<<<<<<< HEAD
-        parser.add_argument("-c", "--number_of_channels", help="Number of channels.", type=int, default=1)
-=======
         parser.add_argument("-c", "--number_of_channels", help="Number of channels.", type=int, default=2)
->>>>>>> 9e190ef425611ee1cef3a5876b5b2ea23f55d8ff
         parser.add_argument("-p", "--mlp", help="My listening port.", type=int, default=4444)
         parser.add_argument("-i", "--ilp", help="Interlocutor's listening port.", type=int, default=4444)
         parser.add_argument("-a", "--ia", help="Interlocutor's IP address or name.", type=str, default="localhost")
