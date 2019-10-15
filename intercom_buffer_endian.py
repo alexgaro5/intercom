@@ -45,10 +45,10 @@ class IntercomBuffer(Intercom):
             
             package = struct.pack('<H{}h'.format(self.samples_per_chunk * self.number_of_channels), self.chunk_counter, *array)  #Packing the message to send
       
+            sending_sock.sendto(package, (self.destination_IP_addr, self.destination_port))
+
             message = lista[(self.pos + self.delay) % self.buffer_capacity]                                                        #Getting the message from the buffer                                     
             self.chunk_counter = (self.chunk_counter + 1) % 65536                                                                  #Incrementing the chunk_to_play
-
-            sending_sock.sendto(package, (self.destination_IP_addr, self.destination_port))
 
             outdata[:] = numpy.reshape(message, (self.samples_per_chunk, self.number_of_channels))                  #Playing the audio recieved
 
