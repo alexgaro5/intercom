@@ -17,6 +17,7 @@ class Intercom_bitplanes(Intercom_buffer):
         self.played_chunk_number = 0
 
         def receive_and_buffer():
+            #1024 * 2
             message, source_address = self.receiving_sock.recvfrom(Intercom.MAX_MESSAGE_SIZE)
             ###################
 
