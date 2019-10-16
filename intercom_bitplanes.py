@@ -29,7 +29,7 @@ class Intercom_bitplanes(Intercom_buffer):
 
         def record_send_and_play(indata, outdata, frames, time, status):
             ###################
-            print(indata)
+
             ###################
             message = struct.pack(self.packet_format, self.recorded_chunk_number, *(indata.flatten()))
             self.recorded_chunk_number = (self.recorded_chunk_number + 1) % self.MAX_CHUNK_NUMBER
