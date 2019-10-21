@@ -11,32 +11,48 @@ class Intercom_bitplanes(Intercom_buffer):
 
     def init(self, args):
         Intercom_buffer.init(self, args)
+        self.packet_format = f"HH{self.frames_per_chunk}h"
 
     def run(self):
         self.recorded_chunk_number = 0
         self.played_chunk_number = 0
 
         def receive_and_buffer():
-            #1024 * 2
-            message, source_address = self.receiving_sock.recvfrom(Intercom.MAX_MESSAGE_SIZE)
-            ###################
 
-            ###################
-            chunk_number, *chunk = struct.unpack(self.packet_format, message)
+            #print("BUFFER:", self._buffer)
+            for i in range(15,-1,-1):
+                package, source_address = self.receiving_sock.recvfrom(Intercom.MAX_MESSAGE_SIZE)
+                chunk_number, self.number_of_bitplane, *bitplane = struct.unpack(self.packet_format, package)
+                bitplane = np.asarray(bitplane)
 
-            self._buffer[chunk_number % self.cells_in_buffer] = np.asarray(chunk).reshape(self.frames_per_chunk, self.number_of_channels)
+                print(bitplane << self.number_of_bitplane)
+                
+                self._buffer[chunk_number % self.cells_in_buffer][:,0] |= (bitplane << self.number_of_bitplane)
 
+                package, source_address = self.receiving_sock.recvfrom(Intercom.MAX_MESSAGE_SIZE)
+                chunk_number, self.number_of_bitplane, *bitplane = struct.unpack(self.packet_format, package)
+                bitplane = np.asarray(bitplane)
+                self._buffer[chunk_number % self.cells_in_buffer][:,1] |= (bitplane << self.number_of_bitplane)
+            
+            #print("CHUNK_NUMBER",chunk_number,"INDATA RECEIVED", self._buffer[chunk_number % self.cells_in_buffer])            
             return chunk_number
 
         def record_send_and_play(indata, outdata, frames, time, status):
-            ###################
 
-            ###################
-            message = struct.pack(self.packet_format, self.recorded_chunk_number, *(indata.flatten()))
+            #print("CHUNK_NUMBER",self.recorded_chunk_number,"INDATA:",indata)
+
+            for i in range(15,-1,-1):
+                array = (indata & (1 << i)) >> i
+                canal1 = array[:,0]
+                canal2 = array[:,1]
+
+                message = struct.pack(self.packet_format, self.recorded_chunk_number, i, *canal1)
+                self.sending_sock.sendto(message, (self.destination_IP_addr, self.destination_port))
+
+                message = struct.pack(self.packet_format, self.recorded_chunk_number, i, *canal2)
+                self.sending_sock.sendto(message, (self.destination_IP_addr, self.destination_port))
+
             self.recorded_chunk_number = (self.recorded_chunk_number + 1) % self.MAX_CHUNK_NUMBER
-
-            self.sending_sock.sendto(message, (self.destination_IP_addr, self.destination_port))
-
             chunk = self._buffer[self.played_chunk_number % self.cells_in_buffer]
             self._buffer[self.played_chunk_number % self.cells_in_buffer] = self.generate_zero_chunk()
             self.played_chunk_number = (self.played_chunk_number + 1) % self.cells_in_buffer
