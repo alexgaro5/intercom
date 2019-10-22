@@ -19,22 +19,19 @@ class Intercom_bitplanes(Intercom_buffer):
 
         def receive_and_buffer():
 
-            for i in range(15,-1,-1):
-                for j in range (0, self.number_of_channels):
-                    package, source_address = self.receiving_sock.recvfrom(Intercom.MAX_MESSAGE_SIZE)
-                    chunk_number, significant, channel, *bitplane = struct.unpack(self.packet_format, package)
-                    bitplane = np.asarray(bitplane)
-                    self._buffer[chunk_number % self.cells_in_buffer][:,channel] |= (bitplane << significant)
+            package, source_address = self.receiving_sock.recvfrom(Intercom.MAX_MESSAGE_SIZE)
+            chunk_number, significant, channel, *bitplane = struct.unpack(self.packet_format, package)
+            self._buffer[chunk_number % self.cells_in_buffer][:,channel] |= (np.asarray(bitplane) << significant)
                       
             return chunk_number
 
         def record_send_and_play(indata, outdata, frames, time, status):
 
-            for i in range(15,-1,-1):
-                array = (indata & (1 << i)) >> i
+            for significant in range(15,-1,-1):
+                array = (indata & (1 << significant)) >> significant
 
-                for j in range (0, self.number_of_channels):
-                    message = struct.pack(self.packet_format, self.recorded_chunk_number, i, j, *array[:,j])
+                for channel in range (0, self.number_of_channels):
+                    message = struct.pack(self.packet_format, self.recorded_chunk_number, significant, channel, *array[:,channel])
                     self.sending_sock.sendto(message, (self.destination_IP_addr, self.destination_port))
 
             self.recorded_chunk_number = (self.recorded_chunk_number + 1) % self.MAX_CHUNK_NUMBER
