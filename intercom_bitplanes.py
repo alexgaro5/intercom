@@ -11,7 +11,7 @@ class Intercom_bitplanes(Intercom_buffer):
 
     def init(self, args):
         Intercom_buffer.init(self, args)
-        self.packet_format = f"HH{self.frames_per_chunk}h"
+        self.packet_format = f"HHH{self.frames_per_chunk}h"
 
     def run(self):
         self.recorded_chunk_number = 0
@@ -19,27 +19,22 @@ class Intercom_bitplanes(Intercom_buffer):
 
         def receive_and_buffer():
 
-            #print("BUFFER:", self._buffer)
             for i in range(15,-1,-1):
                 for j in range (0, self.number_of_channels):
                     package, source_address = self.receiving_sock.recvfrom(Intercom.MAX_MESSAGE_SIZE)
-                    chunk_number, self.number_of_bitplane, *bitplane = struct.unpack(self.packet_format, package)
+                    chunk_number, significant, channel, *bitplane = struct.unpack(self.packet_format, package)
                     bitplane = np.asarray(bitplane)
-                    #print(bitplane << self.number_of_bitplane)
-                    self._buffer[chunk_number % self.cells_in_buffer][:,j] |= (bitplane << self.number_of_bitplane)
-            
-            #print("CHUNK_NUMBER",chunk_number,"INDATA RECEIVED", self._buffer[chunk_number % self.cells_in_buffer])            
+                    self._buffer[chunk_number % self.cells_in_buffer][:,channel] |= (bitplane << significant)
+                      
             return chunk_number
 
         def record_send_and_play(indata, outdata, frames, time, status):
-
-            #print("CHUNK_NUMBER",self.recorded_chunk_number,"INDATA:",indata)
 
             for i in range(15,-1,-1):
                 array = (indata & (1 << i)) >> i
 
                 for j in range (0, self.number_of_channels):
-                    message = struct.pack(self.packet_format, self.recorded_chunk_number, i, *array[:,j])
+                    message = struct.pack(self.packet_format, self.recorded_chunk_number, i, j, *array[:,j])
                     self.sending_sock.sendto(message, (self.destination_IP_addr, self.destination_port))
 
             self.recorded_chunk_number = (self.recorded_chunk_number + 1) % self.MAX_CHUNK_NUMBER
