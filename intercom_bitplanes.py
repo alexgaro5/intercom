@@ -11,7 +11,8 @@ class Intercom_bitplanes(Intercom_buffer):
 
     def init(self, args):
         Intercom_buffer.init(self, args)
-        self.packet_format = f"HHH{self.frames_per_chunk}h"
+        tmp = self.frames_per_chunk/8
+        self.packet_format = f"HHH{tmp}h"
 
     def run(self):
         self.recorded_chunk_number = 0
@@ -21,6 +22,7 @@ class Intercom_bitplanes(Intercom_buffer):
 
             package, source_address = self.receiving_sock.recvfrom(Intercom.MAX_MESSAGE_SIZE)
             chunk_number, significant, channel, *bitplane = struct.unpack(self.packet_format, package)
+            bitplane = np.unpackbits(bitplane)
             self._buffer[chunk_number % self.cells_in_buffer][:,channel] |= (np.asarray(bitplane) << significant)
                       
             return chunk_number
@@ -31,7 +33,9 @@ class Intercom_bitplanes(Intercom_buffer):
                 array = (indata & (1 << significant)) >> significant
 
                 for channel in range (0, self.number_of_channels):
-                    message = struct.pack(self.packet_format, self.recorded_chunk_number, significant, channel, *array[:,channel])
+                    array = np.packbits(array[:,channel])
+                    print(type(array[0]))
+                    message = struct.pack(self.packet_format, self.recorded_chunk_number, significant, channel, *array)
                     self.sending_sock.sendto(message, (self.destination_IP_addr, self.destination_port))
 
             self.recorded_chunk_number = (self.recorded_chunk_number + 1) % self.MAX_CHUNK_NUMBER
