@@ -37,14 +37,13 @@ class Intercom_bitplanes(Intercom_buffer):
 
         def record_send_and_play(indata, outdata, frames, time, status):
 
-            #Recorremos el indata y vamos cogiendo columnas de mas a menos significativo.
-            for significant in range(15,-1,-1):
-                #Cogemos la columna.
-                array = (indata & (1 << significant)) >> significant
 
-                #De las columnas, cogemos un canal.
-                for channel in range (0, self.number_of_channels):
-                    #Cogemos el canal.
+            #De las columnas, cogemos un canal.
+            for channel in range (0, self.number_of_channels):
+                #Recorremos el indata y vamos cogiendo columnas de mas a menos significativo.
+                for significant in range(15,-1,-1):
+                    #Cogemos la columna.
+                    array = (indata & (1 << significant)) >> significant
                     array_channel = array[:,channel]
                     #Lo pasamos a int8.
                     channel_int8 = array_channel.astype(np.uint8)
