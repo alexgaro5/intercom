@@ -8,83 +8,70 @@ from intercom import Intercom
 if __debug__:
     import sys
 
-class Intercom_bitplanes_nuevo(Intercom_buffer):
+class Intercom_bitplanes_nuevo(Intercom_bitplanes):
 
     def init(self, args):
         Intercom_bitplanes.init(self, args)
         #Formado Recorded_chunk, significativo, channel y bitplane
         self.packet_format = f"!HBB{self.frames_per_chunk//8}B"
 
+    def record_send_and_play_two_channel(self, indata, outdata, frames, time, status):
+
+        indata[:,0] -= indata[:,1]
+
+        #Recorremos el indata y vamos cogiendo columnas de mas a menos significativo.
+        for significant in range(15,-1,-1):
+            #De las columnas, cogemos un canal.
+            for channel in range (0, self.number_of_channels):
+                #Cogemos la columna.
+                array = (indata & (1 << significant)) >> significant
+                #Lo pasamos a int8.
+                channel_int8 = array_channel.astype(np.uint8)
+                #Lo compactamos
+                channelpackbits = np.packbits(channel_int8)
+                #Lo empaquetamos en el formado especificado anteriormente.
+                message = struct.pack(self.packet_format, self.recorded_chunk_number, significant, channel, *channelpackbits)
+                #Enviamos el paquete.
+                self.sending_sock.sendto(message, (self.destination_IP_addr, self.destination_port))
+
+        self.recorded_chunk_number = (self.recorded_chunk_number + 1) % self.MAX_CHUNK_NUMBER
+        chunk = self._buffer[self.played_chunk_number % self.cells_in_buffer]
+        chunk[:,0] += chunk[:,1]
+        self._buffer[self.played_chunk_number % self.cells_in_buffer] = self.generate_zero_chunk()
+        self.played_chunk_number = (self.played_chunk_number + 1) % self.cells_in_buffer
+
+        outdata[:] = chunk
+        if __debug__:
+            sys.stderr.write("."); sys.stderr.flush()
+        
     def run(self):
         self.recorded_chunk_number = 0
         self.played_chunk_number = 0
 
-        def receive_and_buffer():
-            
-            #Recibimos el paquete.
-            package, source_address = self.receiving_sock.recvfrom(Intercom.MAX_MESSAGE_SIZE)
-            #Desempaquetamos el paquete.
-            chunk_number, significant, channel, *bitplane = struct.unpack(self.packet_format, package)
-            #Pasamos el bitplane a int8.
-            bitplane_int8 = np.asarray(bitplane, dtype = np.uint8)
-            #Descompactamos el bitplane.
-            bitplaneunpackbits = np.unpackbits(bitplane_int8)
-            #Lo pasamos a int16.
-            bitplane_int16 = bitplaneunpackbits.astype(np.int16)
+        if self.number_of_channels == 1:
 
-            #Si es el primer canal, guardamanos el bitplane en la posición del buffer y de channel necesario. En la posición significativa necesaria.
-            #Si es el segundo, sumamos el segundo canal al primero, y el segundo se guarda normal.
-            if channel == 1:
-                self._buffer[chunk_number % self.cells_in_buffer][:,channel - 1] |= (bitplane_int16 << significant)
+            with sd.Stream(samplerate=self.frames_per_second, 
+                            blocksize=self.frames_per_chunk, 
+                            dtype=np.int16, 
+                            channels=self.number_of_channels, 
+                            callback=self.record_send_and_play):
+                print("-=- Press CTRL + c to quit -=-")
+                first_received_chunk_number = self.receive_and_buffer()
+                self.played_chunk_number = (first_received_chunk_number - self.chunks_to_buffer) % self.cells_in_buffer
+                while True:
+                    self.receive_and_buffer()
+        else:
 
-            self._buffer[chunk_number % self.cells_in_buffer][:,channel] |= (bitplane_int16 << significant)
-                      
-            return chunk_number
-
-        def record_send_and_play(indata, outdata, frames, time, status):
-
-            #De las columnas, cogemos un canal.
-            for channel in range (0, self.number_of_channels):
-                #Recorremos el indata y vamos cogiendo columnas de mas a menos significativo.
-                for significant in range(15,-1,-1):
-                    #Cogemos la columna.
-                    array = (indata & (1 << significant)) >> significant
-                    
-                    #Si es el primer channel, restale el segundo y envialo, si el el segundo, envialo sin hacer nada.
-                    if channel == 0:
-                        array_channel = array[:,channel] & array[:,channel + 1]
-                    else:
-                        array_channel = array[:,channel]
-
-                    #Lo pasamos a int8.
-                    channel_int8 = array_channel.astype(np.uint8)
-                    #Lo compactamos
-                    channelpackbits = np.packbits(channel_int8)
-                    #Lo empaquetamos en el formado especificado anteriormente.
-                    message = struct.pack(self.packet_format, self.recorded_chunk_number, significant, channel, *channelpackbits)
-                    #Enviamos el paquete.
-                    self.sending_sock.sendto(message, (self.destination_IP_addr, self.destination_port))
-
-            self.recorded_chunk_number = (self.recorded_chunk_number + 1) % self.MAX_CHUNK_NUMBER
-            chunk = self._buffer[self.played_chunk_number % self.cells_in_buffer]
-            self._buffer[self.played_chunk_number % self.cells_in_buffer] = self.generate_zero_chunk()
-            self.played_chunk_number = (self.played_chunk_number + 1) % self.cells_in_buffer
-
-            outdata[:] = chunk
-
-            if __debug__:
-                sys.stderr.write("."); sys.stderr.flush()
-
-        with sd.Stream(samplerate=self.frames_per_second, 
-                       blocksize=self.frames_per_chunk, 
-                       dtype=np.int16, 
-                       channels=self.number_of_channels, 
-                       callback=record_send_and_play):
-            print("-=- Press CTRL + c to quit -=-")
-            first_received_chunk_number = receive_and_buffer()
-            self.played_chunk_number = (first_received_chunk_number - self.chunks_to_buffer) % self.cells_in_buffer
-            while True:
-                receive_and_buffer()
+            with sd.Stream(samplerate=self.frames_per_second, 
+                            blocksize=self.frames_per_chunk, 
+                            dtype=np.int16, 
+                            channels=self.number_of_channels, 
+                            callback=self.record_send_and_play_two_channel):
+                print("-=- Press CTRL + c to quit -=-")
+                first_received_chunk_number = self.receive_and_buffer()
+                self.played_chunk_number = (first_received_chunk_number - self.chunks_to_buffer) % self.cells_in_buffer
+                while True:
+                    self.receive_and_buffer()
 
 if __name__ == "__main__":
     intercom = Intercom_bitplanes_nuevo()
