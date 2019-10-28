@@ -1,14 +1,14 @@
 import sounddevice as sd
 import numpy as np
 import struct
-from intercom_bitplane import Intercom_bitplanes
+from intercom_bitplanes import Intercom_bitplanes
 from intercom_buffer import Intercom_buffer
 from intercom import Intercom
 
 if __debug__:
     import sys
 
-class Intercom_bitplanes(Intercom_buffer):
+class Intercom_bitplanes_nuevo(Intercom_buffer):
 
     def init(self, args):
         Intercom_bitplanes.init(self, args)
