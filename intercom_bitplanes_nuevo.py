@@ -35,7 +35,7 @@ class Intercom_bitplanes_nuevo(Intercom_buffer):
             #Si es el primer canal, guardamanos el bitplane en la posición del buffer y de channel necesario. En la posición significativa necesaria.
             #Si es el segundo, sumamos el segundo canal al primero, y el segundo se guarda normal.
             if channel == 1:
-                self._buffer[chunk_number % self.cells_in_buffer][:,channel - 1] += (bitplane_int16 << significant)
+                self._buffer[chunk_number % self.cells_in_buffer][:,channel - 1] |= (bitplane_int16 << significant)
 
             self._buffer[chunk_number % self.cells_in_buffer][:,channel] |= (bitplane_int16 << significant)
                       
@@ -52,7 +52,7 @@ class Intercom_bitplanes_nuevo(Intercom_buffer):
                     
                     #Si es el primer channel, restale el segundo y envialo, si el el segundo, envialo sin hacer nada.
                     if channel == 0:
-                        array_channel = array[:,channel] - array[:,channel + 1]
+                        array_channel = array[:,channel] & array[:,channel + 1]
                     else:
                         array_channel = array[:,channel]
 
