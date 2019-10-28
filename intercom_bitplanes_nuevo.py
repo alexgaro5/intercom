@@ -25,6 +25,8 @@ class Intercom_bitplanes_nuevo(Intercom_bitplanes):
             for channel in range (0, self.number_of_channels):
                 #Cogemos la columna.
                 array = (indata & (1 << significant)) >> significant
+                #Cogemos el canal.
+                array_channel = array[:,channel]
                 #Lo pasamos a int8.
                 channel_int8 = array_channel.astype(np.uint8)
                 #Lo compactamos
