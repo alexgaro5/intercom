@@ -1,7 +1,7 @@
 import sounddevice as sd
 import numpy as np
 import struct
-from intercom_bitplane import Intercom_buffer_bitplane
+from intercom_bitplane import Intercom_bitplanes
 from intercom_buffer import Intercom_buffer
 from intercom import Intercom
 
@@ -11,7 +11,7 @@ if __debug__:
 class Intercom_bitplanes(Intercom_buffer):
 
     def init(self, args):
-        Intercom_bitplane.init(self, args)
+        Intercom_bitplanes.init(self, args)
         #Formado Recorded_chunk, significativo, channel y bitplane
         self.packet_format = f"!HBB{self.frames_per_chunk//8}B"
 
