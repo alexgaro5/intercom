@@ -19,8 +19,8 @@ class Intercom_bitplanes_nuevo(Intercom_bitplanes):
         indata[:,0] -= indata[:,1]
         #Recorremos el indata y vamos cogiendo columnas de mas a menos significativo.
         for significant in range(15,-1,-1):
-            for channel in range (0, self.number_of_channels):  #De las columnas, cogemos un canal.
-                array = (indata & (1 << significant)) >> significant    #Cogemos la columna.
+            array = (indata & (1 << significant)) >> significant    #Cogemos la columna.
+            for channel in range (0, self.number_of_channels):      #De las columnas, cogemos un canal.
                 array_channel = array[:,channel]                        #Lo pasamos a int8.
                 channel_int8 = array_channel.astype(np.uint8)           #Lo compactamos
                 channelpackbits = np.packbits(channel_int8)             #Lo empaquetamos en el formado especificado anteriormente.
