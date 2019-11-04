@@ -11,36 +11,36 @@ class Intercom_bitplanes(Intercom_buffer):
 
     def init(self, args):
         Intercom_buffer.init(self, args)
-        self.packet_format = f"!HBB{self.frames_per_chunk//8}B"     #Formado Recorded_chunk, significativo, channel y bitplane. El /8 es porque compactamos el paquete a int8 y el tamaño del paquete es menor.
+        self.packet_format = f"!HBB{self.frames_per_chunk//8}B"     #Format Recorded_chunk, significativo, channel y bitplane. The /8 is to compact the package from int16 to int8, so
+																	#the packet size is smaller 
 
     def receive_and_buffer(self):
-        
-        
-        package, source_address = self.receiving_sock.recvfrom(Intercom.MAX_MESSAGE_SIZE)                   #Recibimos el paquete.        
-        chunk_number, significant, channel, *bitplane = struct.unpack(self.packet_format, package)          #Desempaquetamos el paquete.      
-        bitplane_int8 = np.asarray(bitplane, dtype = np.uint8)                                              #Pasamos el bitplane a int8.      
-        bitplaneunpackbits = np.unpackbits(bitplane_int8)                                                   #Descompactamos el bitplane.         
-        bitplane_int16 = bitplaneunpackbits.astype(np.int16)                                                #Lo pasamos a int16. 
-        self._buffer[chunk_number % self.cells_in_buffer][:,channel] |= (bitplane_int16 << significant)     #Guardamanos el bitplane en la posición del buffer y de channel necesario, en la posición significativa.
+                
+        package, source_address = self.receiving_sock.recvfrom(Intercom.MAX_MESSAGE_SIZE)                   #Receive the package     
+        chunk_number, significant, channel, *bitplane = struct.unpack(self.packet_format, package)          #Unpack the package      
+        bitplane_int8 = np.asarray(bitplane, dtype = np.uint8)                                              #Change the bitplane to int8.      
+        bitplaneunpackbits = np.unpackbits(bitplane_int8)                                                   #Uncompact the bitplane.         
+        bitplane_int16 = bitplaneunpackbits.astype(np.int16)                                                #Change the format of the bitplane to int16. 
+        self._buffer[chunk_number % self.cells_in_buffer][:,channel] |= (bitplane_int16 << significant)     #Save the bitplane in the index of the buffer and channel, in the significative index.																											
                       
         return chunk_number
 
     def record_send_and_play(self, indata, outdata, frames, time, status):
-             
-        for significant in range(15,-1,-1):                                                                                         #Recorremos el indata y vamos cogiendo columnas de mas a menos significativo.
-            array = (indata & (1 << significant)) >> significant                                                                    #Cogemos la columna con el nivel de signifido seleccionado.
-            for channel in range (0, self.number_of_channels):                                                                      #De las columna seleccionada, Recorremos los canales de uno en uno.
-                array_channel = array[:,channel]                                                                                    #Cogemos el canal selecciona. 
-                channel_int8 = array_channel.astype(np.uint8)                                                                       #Lo pasamos a int8. 
-                channelpackbits = np.packbits(channel_int8)                                                                         #Lo compactamos.
-                message = struct.pack(self.packet_format, self.recorded_chunk_number, significant, channel, *channelpackbits)       #Lo empaquetamos en el formado especificado anteriormente.
-                self.sending_sock.sendto(message, (self.destination_IP_addr, self.destination_port))                                #Enviamos el paquete.           
+																																	
+        for significant in range(15,-1,-1):                                                                                         #Go through in indata and get the column in decreasing significative order
+            array = (indata & (1 << significant)) >> significant                                                                    #Get the significative column 
+            for channel in range (0, self.number_of_channels):                                                                      #In the selected column, go through the channels one by one.
+                array_channel = array[:,channel]                                                                                    #Get the selected channel. 
+                channel_int8 = array_channel.astype(np.uint8)                                                                       #Change the format to int8. 
+                channelpackbits = np.packbits(channel_int8)                                                                         #Compact the information.
+                message = struct.pack(self.packet_format, self.recorded_chunk_number, significant, channel, *channelpackbits)       #Pack the information with the specified format.
+                self.sending_sock.sendto(message, (self.destination_IP_addr, self.destination_port))                                #Send the package.           
 
         
-        self.recorded_chunk_number = (self.recorded_chunk_number + 1) % self.MAX_CHUNK_NUMBER               #Aumentamos el record_chunk_number.
-        chunk = self._buffer[self.played_chunk_number % self.cells_in_buffer]                               #Cogemos del buffer un paquete para leer.
-        self._buffer[self.played_chunk_number % self.cells_in_buffer] = self.generate_zero_chunk()          #Ponemos en la posición del buffer ceros.
-        self.played_chunk_number = (self.played_chunk_number + 1) % self.cells_in_buffer                    #Aumentamos el playec_chunk_number.
+        self.recorded_chunk_number = (self.recorded_chunk_number + 1) % self.MAX_CHUNK_NUMBER               #Increase the record_chunk_number.
+        chunk = self._buffer[self.played_chunk_number % self.cells_in_buffer]                               #Get one package from the buffer to read the information.
+        self._buffer[self.played_chunk_number % self.cells_in_buffer] = self.generate_zero_chunk()          #Change the value in the position to zero.
+        self.played_chunk_number = (self.played_chunk_number + 1) % self.cells_in_buffer                    #Increase the played_chunk_number.
 
         outdata[:] = chunk
         if __debug__:
