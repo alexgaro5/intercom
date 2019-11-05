@@ -26,7 +26,7 @@ class Intercom_bitplanes(Intercom_buffer):
         return chunk_number
 
     def record_send_and_play(self, indata, outdata, frames, time, status):
-																																	
+
         for significant in range(15,-1,-1):                                                                                         #Go through in indata and get the column in decreasing significative order
             array = (indata & (1 << significant)) >> significant                                                                    #Get the significative column 
             for channel in range (0, self.number_of_channels):                                                                      #In the selected column, go through the channels one by one.
