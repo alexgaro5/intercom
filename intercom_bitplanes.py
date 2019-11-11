@@ -2,6 +2,8 @@
 
 import sounddevice as sd
 import numpy as np
+import struct
+from intercom import Intercom
 from intercom_buffer import Intercom_buffer
 
 if __debug__:
