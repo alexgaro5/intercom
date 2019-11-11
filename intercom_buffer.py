@@ -27,7 +27,7 @@ class Intercom_buffer(Intercom):
         self.packet_format = f"!H{self.samples_per_chunk}h"
         if __debug__:
             print(f"chunks_to_buffer={self.chunks_to_buffer}")
-
+    
     def receive_and_buffer(self):
         message, source_address = self.receiving_sock.recvfrom(Intercom.MAX_MESSAGE_SIZE)
         chunk_number, *chunk = struct.unpack(self.packet_format, message)
