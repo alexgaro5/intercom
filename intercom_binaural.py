@@ -19,18 +19,13 @@ class Intercom_binaural(Intercom_bitplanes):
 
     def record_send_and_play_stereo(self, indata, outdata, frames, time, status):
 
-        indata[:,0] -= indata[:,1]                                                                    #We substract the channel 1 to the channel 0 to make it lighter and we send it in bitplanes.
+        indata[:,1] -= indata[:,0]                                                                    #We substract the channel 0 to the channel 1 to make it lighter and we send it in bitplanes.
 
-        for bitplane_number in range(self.number_of_channels*16-1, -1, -1):
-            bitplane = (indata[:, bitplane_number%self.number_of_channels] >> bitplane_number//self.number_of_channels) & 1
-            bitplane = bitplane.astype(np.uint8)
-            bitplane = np.packbits(bitplane)
-            message = struct.pack(self.packet_format, self.recorded_chunk_number, bitplane_number, *bitplane)
-            self.sending_sock.sendto(message, (self.destination_IP_addr, self.destination_port))
+        Intercom_bitplanes.send(self, indata)                                                         #We call the method called 'send' to send el bitplanes.
 
         self.recorded_chunk_number = (self.recorded_chunk_number + 1) % self.MAX_CHUNK_NUMBER
         chunk = self._buffer[self.played_chunk_number % self.cells_in_buffer]
-        chunk[:,0] += chunk[:,1]                                                                      #When we have received all the bitplanes, we add the channel 1 to the channel 0 to restore and play it.
+        chunk[:,1] += chunk[:,0]                                                                      #When we have received all the bitplanes, we add the channel 0 to the channel 1 to restore and play it.
         self._buffer[self.played_chunk_number % self.cells_in_buffer] = self.generate_zero_chunk()
         self.played_chunk_number = (self.played_chunk_number + 1) % self.cells_in_buffer
         outdata[:] = chunk
