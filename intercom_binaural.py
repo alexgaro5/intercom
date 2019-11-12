@@ -18,16 +18,10 @@ class Intercom_binaural(Intercom_bitplanes):
 
     def record_send_and_play_stereo(self, indata, outdata, frames, time, status):
 
-        indata[:,1] -= indata[:,0]                                                                    #We substract the channel 0 to the channel 1 to make it lighter and we send it in bitplanes.
-
-        Intercom_bitplanes.send(self, indata)                                                         #We call the method called 'send' to send el bitplanes.
-
-        self.recorded_chunk_number = (self.recorded_chunk_number + 1) % self.MAX_CHUNK_NUMBER
-        chunk = self._buffer[self.played_chunk_number % self.cells_in_buffer]
-        chunk[:,1] += chunk[:,0]                                                                      #When we have received all the bitplanes, we add the channel 0 to the channel 1 to restore and play it.
-        self._buffer[self.played_chunk_number % self.cells_in_buffer] = self.generate_zero_chunk()
-        self.played_chunk_number = (self.played_chunk_number + 1) % self.cells_in_buffer
-        outdata[:] = chunk
+        indata[:,0] -= indata[:,1]                                                                    #We substract the channel 0 to the channel 1 to make it lighter and we send it in bitplanes.
+        self.record_and_send(indata)                                                                  #We call the method called 'send' to send el bitplanes.
+        self._buffer[self.played_chunk_number % self.cells_in_buffer][:,0] += self._buffer[self.played_chunk_number % self.cells_in_buffer][:,1]    #When we have received all the bitplanes, we add the channel 0 to the channel 1 to restore and play it.
+        self.play(outdata)
 
         if __debug__:
             sys.stderr.write("."); sys.stderr.flush()
