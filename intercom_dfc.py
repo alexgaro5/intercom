@@ -6,12 +6,16 @@ import struct
 from intercom import Intercom
 from intercom_binaural import Intercom_binaural
 
+if __debug__:
+    import sys
+
 class Intercom_dfc(Intercom_binaural):
 
     def init(self, args):
         Intercom_binaural.init(self, args)
         self.send_packet_format = f"!HB{self.frames_per_chunk//8}B"
         self.number_of_packets = 16*self.number_of_channels
+
         self.current_chunk_number = 0
         self.count = 0
 
@@ -21,12 +25,12 @@ class Intercom_dfc(Intercom_binaural):
 
         #NEW
         self.count += 1
-        
-        if (self.current_chunk_number != chunk_number) & (self.count < self.number_of_packets): 
-            self.number_of_packets = self.count
 
         if self.current_chunk_number != chunk_number:
             self.current_chunk_number = chunk_number
+            if self.count < self.number_of_packets:
+               self.number_of_packets = (int)(self.number_of_packets*0,8) + (self.count*0,2)
+            print("<chunk>,<count>: <",self.current_chunk_number,">,<",self.count,">")
             self.count = 0
         #NEW
 

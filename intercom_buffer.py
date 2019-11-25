@@ -5,13 +5,6 @@ import numpy as np
 import struct
 from intercom import Intercom
 
-# Adding a buffer.
-
-import sounddevice as sd
-import numpy as np
-import struct
-from intercom import Intercom
-
 if __debug__:
     import sys
 
