@@ -14,25 +14,28 @@ class Intercom_dfc(Intercom_binaural):
     def init(self, args):
         Intercom_binaural.init(self, args)
         self.send_packet_format = f"!HB{self.frames_per_chunk//8}B"
-        self.number_of_packets = 16*self.number_of_channels
-
+        #El numero actual de bitplanes que se envian.
+        self.number_of_bitplanes = 16*self.number_of_channels
+        #El numero actual de chunk.
         self.current_chunk_number = 0
-        self.count = 0
+        #El numero de bitplanes recibidos en un chunk.
+        self.bitplane_recieved = 0
 
     def receive_and_buffer(self):
         message, source_address = self.receiving_sock.recvfrom(Intercom.MAX_MESSAGE_SIZE)
         chunk_number, bitplane_number, *bitplane = struct.unpack(self.packet_format, message)
 
-        #NEW
-        self.count += 1
-
+        #Incrementamos el contador de bitplane, pues hemos recibido uno.
+        self.bitplane_recieved += 1
+        #Si hay un cambio de chunk...
         if self.current_chunk_number != chunk_number:
+            #Si se han recibido menos bitplanes en este chunk que en el anterior, se actualiza el numero de bitplanes a enviar para el siguiente chunk haciendo una media ponderada entre los bitplanes enviados y recibidos.
+            if self.bitplane_recieved < self.number_of_bitplanes:
+               self.number_of_bitplanes = (int)(self.number_of_bitplanes*0,8) + (self.bitplane_recieved*0,2)
+            #actualizamos el numero de chunk actual,
             self.current_chunk_number = chunk_number
-            if self.count < self.number_of_packets:
-               self.number_of_packets = (int)(self.number_of_packets*0,8) + (self.count*0,2)
-            print("<chunk>,<count>: <",self.current_chunk_number,">,<",self.count,">")
-            self.count = 0
-        #NEW
+            #Reseteamos la variable de bitplanes a 0, pues hemos pasado de un chunk a otro diferente.
+            self.bitplane_recieved = 0
 
         bitplane = np.asarray(bitplane, dtype=np.uint8)
         bitplane = np.unpackbits(bitplane)
@@ -42,8 +45,8 @@ class Intercom_dfc(Intercom_binaural):
 
     def record_send_and_play(self, indata, outdata, frames, time, status): 
         
-        #NEW
-        for bitplane_number in range(self.number_of_packets-1, -1, -1):
+        #El numero de bitplanes que enviemos, dependerá de los bitplanes que se reciban, por eso el bucle depende de una variable.
+        for bitplane_number in range(self.number_of_bitplanes-1, -1, -1):
             bitplane = (indata[:, bitplane_number%self.number_of_channels] >> bitplane_number//self.number_of_channels) & 1
             bitplane = bitplane.astype(np.uint8)
             bitplane = np.packbits(bitplane)
@@ -51,8 +54,8 @@ class Intercom_dfc(Intercom_binaural):
             self.sending_sock.sendto(message, (self.destination_IP_addr, self.destination_port))
         self.recorded_chunk_number = (self.recorded_chunk_number + 1) % self.MAX_CHUNK_NUMBER
         
-        if self.number_of_packets < 16*self.number_of_channels: self.number_of_packets += 1
-        #NEW
+        #Para intentar restablecer el numero por defecto de bitplanes, por cada chunk se intentará incrementar a uno más el numero de bitplanes a enviar. 
+        if self.number_of_bitplanes < 16*self.number_of_channels: self.number_of_bitplanes += 1
 
         self.play(outdata)
 
@@ -60,8 +63,8 @@ class Intercom_dfc(Intercom_binaural):
 
         indata[:,0] -= indata[:,1]   
         
-        #NEW
-        for bitplane_number in range(self.number_of_packets-1, -1, -1):
+        #El numero de bitplanes que enviemos, dependerá de los bitplanes que se reciban, por eso el bucle depende de una variable.
+        for bitplane_number in range(self.number_of_bitplanes-1, -1, -1):
             bitplane = (indata[:, bitplane_number%self.number_of_channels] >> bitplane_number//self.number_of_channels) & 1
             bitplane = bitplane.astype(np.uint8)
             bitplane = np.packbits(bitplane)
@@ -70,8 +73,8 @@ class Intercom_dfc(Intercom_binaural):
         self.recorded_chunk_number = (self.recorded_chunk_number + 1) % self.MAX_CHUNK_NUMBER     
         self._buffer[self.played_chunk_number % self.cells_in_buffer][:,0] += self._buffer[self.played_chunk_number % self.cells_in_buffer][:,1]   
         
-        if self.number_of_packets < 16*self.number_of_channels: self.number_of_packets += 1
-        #NEW
+        #Para intentar restablecer el numero por defecto de bitplanes, por cada chunk se intentará incrementar a uno más el numero de bitplanes a enviar. 
+        if self.number_of_bitplanes < 16*self.number_of_channels: self.number_of_bitplanes += 1
 
         self.play(outdata)
 
