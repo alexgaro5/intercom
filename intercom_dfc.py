@@ -42,7 +42,7 @@ class Intercom_dfc(Intercom_binaural):
         if self.current_chunk_number != chunk_number:
             #If we have received less bitplanes in the current chunk than in the previous chunk, we update the number of bitplanes that must be sent in the next chunk computing a weighted average with the received and sent bitplanes.
             if self.bitplane_recieved < self.number_of_bitplanes:
-               self.number_of_bitplanes = (int)(self.number_of_bitplanes*0,8) + (self.bitplane_recieved*0,2)
+               self.number_of_bitplanes = int((self.number_of_bitplanes*0.8) + (self.bitplane_recieved*0.2))
             #We update the current chunk number.
             self.current_chunk_number = chunk_number
             #We reset the biplane var as we have changed to a different chunk.
