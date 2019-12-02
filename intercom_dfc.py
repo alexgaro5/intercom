@@ -21,6 +21,17 @@ class Intercom_dfc(Intercom_binaural):
         #Number of bitplanes received in one chunk.
         self.bitplane_recieved = 0
 
+    def play(self, outdata):
+        chunk = self._buffer[self.played_chunk_number % self.cells_in_buffer]
+        self._buffer[self.played_chunk_number % self.cells_in_buffer] = self.generate_zero_chunk()
+        self.played_chunk_number = (self.played_chunk_number + 1) % self.cells_in_buffer
+
+        signo = chunk >> 15
+        outdata[:] = (~signo & chunk) | (((chunk & 0x8000) - chunk) & signo) 
+
+        if __debug__:
+            sys.stderr.write("."); sys.stderr.flush()   
+
     def receive_and_buffer(self):
         message, source_address = self.receiving_sock.recvfrom(Intercom.MAX_MESSAGE_SIZE)
         chunk_number, bitplane_number, *bitplane = struct.unpack(self.packet_format, message)
@@ -44,6 +55,12 @@ class Intercom_dfc(Intercom_binaural):
         return chunk_number
 
     def record_send_and_play(self, indata, outdata, frames, time, status): 
+
+        #SIGNO-MAGNITUD
+        signo = indata & 0x8000
+        magnitud = abs(indata)
+        indata = signo | magnitud
+        #SIGNO-MAGNITUD
         
         #The number of bitplanes that we are going to send will depend on the received biplanes. That is why the loop depends on a var.
         for bitplane_number in range(self.number_of_bitplanes-1, -1, -1):
@@ -61,6 +78,12 @@ class Intercom_dfc(Intercom_binaural):
 
     def record_send_and_play_stereo(self, indata, outdata, frames, time, status):
 
+        #SIGNO-MAGNITUD
+        signo = indata & 0x8000
+        magnitud = abs(indata)
+        indata = signo | magnitud
+        #SIGNO-MAGNITUD
+
         indata[:,0] -= indata[:,1]   
         
         #The number of biplanes that we are going to send will depend on the received bitplanes. That is why the loop depends on a var.
@@ -70,7 +93,8 @@ class Intercom_dfc(Intercom_binaural):
             bitplane = np.packbits(bitplane)
             message = struct.pack(self.packet_format, self.recorded_chunk_number, bitplane_number, *bitplane)
             self.sending_sock.sendto(message, (self.destination_IP_addr, self.destination_port))
-        self.recorded_chunk_number = (self.recorded_chunk_number + 1) % self.MAX_CHUNK_NUMBER     
+        self.recorded_chunk_number = (self.recorded_chunk_number + 1) % self.MAX_CHUNK_NUMBER  
+
         self._buffer[self.played_chunk_number % self.cells_in_buffer][:,0] += self._buffer[self.played_chunk_number % self.cells_in_buffer][:,1]   
         
         #In order to reset the default bitplanes number, for each chunk we will try to increase by one the number of bitplanes to send.
