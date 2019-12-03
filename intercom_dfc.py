@@ -25,9 +25,12 @@ class Intercom_dfc(Intercom_binaural):
         chunk = self._buffer[self.played_chunk_number % self.cells_in_buffer]
         self._buffer[self.played_chunk_number % self.cells_in_buffer] = self.generate_zero_chunk()
         self.played_chunk_number = (self.played_chunk_number + 1) % self.cells_in_buffer
-
+	
+	#NEW
         signo = chunk >> 15
-        outdata[:] = (~signo & chunk) | (((chunk & 0x8000) - chunk) & signo) 
+        magnitude = chunk & 0x7FFF
+        outdata[:] = (~signo & magnitude) | (((magnitude & 0x8000) - magnitude) & signo) 
+	#NEW
 
         if __debug__:
             sys.stderr.write("."); sys.stderr.flush()   
@@ -56,11 +59,11 @@ class Intercom_dfc(Intercom_binaural):
 
     def record_send_and_play(self, indata, outdata, frames, time, status): 
 
-        #SIGNO-MAGNITUD
+        #NEW
         signo = indata & 0x8000
         magnitud = abs(indata)
         indata = signo | magnitud
-        #SIGNO-MAGNITUD
+        #NEW
         
         #The number of bitplanes that we are going to send will depend on the received biplanes. That is why the loop depends on a var.
         for bitplane_number in range(self.number_of_bitplanes-1, -1, -1):
@@ -78,11 +81,11 @@ class Intercom_dfc(Intercom_binaural):
 
     def record_send_and_play_stereo(self, indata, outdata, frames, time, status):
 
-        #SIGNO-MAGNITUD
+        #NEW
         signo = indata & 0x8000
         magnitud = abs(indata)
         indata = signo | magnitud
-        #SIGNO-MAGNITUD
+        #NEW
 
         indata[:,0] -= indata[:,1]   
         
