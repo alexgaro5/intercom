@@ -19,17 +19,19 @@ class Intercom_dfc(Intercom_binaural):
         #Current chunk number.
         self.current_chunk_number = 0
         #Number of bitplanes received in one chunk.
-        self.bitplane_recieved = 0
+        self.bitplane_received = 0
 
     def play(self, outdata):
         chunk = self._buffer[self.played_chunk_number % self.cells_in_buffer]
         self._buffer[self.played_chunk_number % self.cells_in_buffer] = self.generate_zero_chunk()
         self.played_chunk_number = (self.played_chunk_number + 1) % self.cells_in_buffer
-	
-	#NEW
-        signo = chunk >> 15
+
+	    #Obtenemos la columna mas significativa del chunk (la primera, que contiene el signo de los numeros).
+        sign = chunk >> 15
+        #Obtenemos el resto del chunk.
         magnitude = chunk & 0x7FFF
-        outdata[:] = (~signo & magnitude) | (((magnitude & 0x8000) - magnitude) & signo) 
+        #Si el numero es positivo, no se hace nada, si es negativo, se pasa a de signo magnitud a complemento A2.
+        outdata[:] = (~sign & magnitude) | (((magnitude & 0x8000) - magnitude) & sign) 
 	#NEW
 
         if __debug__:
@@ -40,16 +42,16 @@ class Intercom_dfc(Intercom_binaural):
         chunk_number, bitplane_number, *bitplane = struct.unpack(self.packet_format, message)
 
         #We increase the bitplane counter, as we have received one.
-        self.bitplane_recieved += 1
+        self.bitplane_received += 1
         #If there is a change of chunk...
         if self.current_chunk_number != chunk_number:
             #If we have received less bitplanes in the current chunk than in the previous chunk, we update the number of bitplanes that must be sent in the next chunk computing a weighted average with the received and sent bitplanes.
-            if self.bitplane_recieved < self.number_of_bitplanes:
-               self.number_of_bitplanes = int((self.number_of_bitplanes*0.8) + (self.bitplane_recieved*0.2))
+            if self.bitplane_received < self.number_of_bitplanes:
+               self.number_of_bitplanes = int((self.number_of_bitplanes*0.8) + (self.bitplane_received*0.2))
             #We update the current chunk number.
             self.current_chunk_number = chunk_number
             #We reset the biplane var as we have changed to a different chunk.
-            self.bitplane_recieved = 0
+            self.bitplane_received = 0
 
         bitplane = np.asarray(bitplane, dtype=np.uint8)
         bitplane = np.unpackbits(bitplane)
@@ -59,11 +61,12 @@ class Intercom_dfc(Intercom_binaural):
 
     def record_send_and_play(self, indata, outdata, frames, time, status): 
 
-        #NEW
-        signo = indata & 0x8000
-        magnitud = abs(indata)
-        indata = signo | magnitud
-        #NEW
+        #Obtenemos la columna mas significativa del indata (la primera, que contiene el signo de los numeros).
+        sign = indata & 0x8000
+        #Ponemos en valor absoluto todo el indata y lo guardamos en magnitude.
+        magnitude = abs(indata)
+        #Añadimos a maginute la primera columna con el signo del número, obteniendo de esta manera el signo-magnutud, y lo guardamos en indata.
+        indata = sign | magnitude
         
         #The number of bitplanes that we are going to send will depend on the received biplanes. That is why the loop depends on a var.
         for bitplane_number in range(self.number_of_bitplanes-1, -1, -1):
@@ -82,9 +85,9 @@ class Intercom_dfc(Intercom_binaural):
     def record_send_and_play_stereo(self, indata, outdata, frames, time, status):
 
         #NEW
-        signo = indata & 0x8000
+        sign = indata & 0x8000
         magnitud = abs(indata)
-        indata = signo | magnitud
+        indata = sign | magnitud
         #NEW
 
         indata[:,0] -= indata[:,1]   
