@@ -24,11 +24,11 @@ class Intercom_dfc(Intercom_binaural):
 
     def record_send_and_play(self, indata, outdata, frames, time, status): 
 
-        #Obtenemos la columna mas significativa del indata (la primera, que contiene el signo de los numeros).
+        #We get the most significative column from indata (the first one, which has the numbers sign)
         sign = indata & 0x8000
-        #Ponemos en valor absoluto todo el indata y lo guardamos en magnitude.
+        #We calculate the absolute value of the indata and we save it in magnitude.
         magnitude = abs(indata)
-        #Añadimos a maginute la primera columna con el signo del número, obteniendo de esta manera el signo-magnutud, y lo guardamos en indata.
+        #We add to magnitude the first column with the number sign, and we get the sign-magnitude representation, and we save it in indata.
         indata = sign | magnitude
         
         #The number of bitplanes that we are going to send will depend on the received biplanes. That is why the loop depends on a var.
@@ -47,11 +47,11 @@ class Intercom_dfc(Intercom_binaural):
 
     def record_send_and_play_stereo(self, indata, outdata, frames, time, status):
 
-        #Obtenemos la columna mas significativa del indata (la primera, que contiene el signo de los numeros).
+        #We get the most significative column from indata (the first one, which has the numbers sign)
         sign = indata & 0x8000
-        #Ponemos en valor absoluto todo el indata y lo guardamos en magnitude.
+        #We calculate the absolute value of the indata and we save it in magnitude.
         magnitude = abs(indata)
-        #Añadimos a maginute la primera columna con el signo del número, obteniendo de esta manera el signo-magnutud, y lo guardamos en indata.
+        #We add to magnitude the first column with the number sign, and we get the sign-magnitude representation, and we save it in indata.
         indata = sign | magnitude
 
         indata[:,0] -= indata[:,1]   
@@ -99,11 +99,11 @@ class Intercom_dfc(Intercom_binaural):
         self._buffer[self.played_chunk_number % self.cells_in_buffer] = self.generate_zero_chunk()
         self.played_chunk_number = (self.played_chunk_number + 1) % self.cells_in_buffer
 
-	    #Obtenemos la columna mas significativa del chunk (la primera, que contiene el signo de los numeros).
+        #We get the most significative column from the chunk (the first one, which has the numbers sign)
         sign = chunk >> 15
-        #Obtenemos el resto del chunk.
+        #We get the rest of the chunk.
         magnitude = chunk & 0x7FFF
-        #Si el numero es positivo, no se hace nada, si es negativo, se pasa a de signo magnitud a complemento A2.
+        #If the number is positive, we dont change nothing, but if it is negative, we change it from sign-magnitude to two complement.
         outdata[:] = (~sign & magnitude) | (((magnitude & 0x8000) - magnitude) & sign) 
 
         if __debug__:
