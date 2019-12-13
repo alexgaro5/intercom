@@ -1,5 +1,27 @@
 # Implementing a Data-Flow Control algorithm.
 
+    #EXPLICATION:
+    #
+    #We have three new variables:
+    #
+    #	-number_of_bitplanes, it has a default value of sixteen times number_of_channels, and this is the number of bitplanes that we are going to send.
+    #	-current_chunk_number, it's the current number of chunk.
+    #	-bitplanes_recieved, it's the number of bitplanes that we recieved in the recieve method.
+    #
+    #We rewrite fourth method.
+    #
+    #	The first and the second method are the same, one of them is used when the number of channels is one, and the other when the number of channel is two.
+    #First we convert two's complement to sign-magnitude number splitting the first column of the indata (sign) and calculating the absolute value to the rest colums of the indata (magnitude) and linking them again. 
+    #Later, we change the number of bitplanes that we send. Before we send the same number for each chunk. Now we send a different number that we control with number_of_bitplane variable.
+    #If the network is overloaded, the number of bitplanes decrease because the variable is updated in the recieved method.
+    #
+    #	The third is recieve method. We increase the bitplane_received varaible while the chunk number that we recieved is the same.
+    #If the chunk_number  is not the same than current_chunk_numer, we check the number of bitplanes received, if this is less than number_of_bitplanes, we update the number of bitplanes that the computer send, doing a  weighted average between the number_of_bitplanes and the bitplanes received, to avoid overloading the network.
+    #Also we update the current_chunk_number and reset the bitplane_received, because we have changed the chunk_number.
+    #If the network works fine again, we have to increase the number_of_bitplane variable to send more bitplanes again, so we are going to try to increase this varaible for each chunk, so we wil get the maximum bitplanes that we can send if the network allow it.
+    #
+    #	The fourth method we convert two's complement to sign-madnitude to play the audio correctly. We use an algorithm that teacher shared with us.
+
 import sounddevice as sd
 import numpy as np
 import struct
