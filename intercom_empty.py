@@ -21,6 +21,14 @@ class Intercom_empty(Intercom_DFC):
     def init(self, args):
         Intercom_DFC.init(self, args)
 
+    def send_bitplane(self, indata, bitplane_number):
+        bitplane = (indata[:, bitplane_number%self.number_of_channels] >> bitplane_number//self.number_of_channels) & 1
+        bitplane = bitplane.astype(np.uint8)
+        if(bitplane.sum() != 0):
+            bitplane = np.packbits(bitplane)
+            message = struct.pack(self.packet_format, self.recorded_chunk_number, bitplane_number, self.received_bitplanes_per_chunk[(self.played_chunk_number+1) % self.cells_in_buffer]+1, *bitplane)
+            self.sending_sock.sendto(message, (self.destination_IP_addr, self.destination_port))
+
 if __name__ == "__main__":
     intercom = Intercom_empty()
     parser = intercom.add_args()
