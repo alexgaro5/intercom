@@ -71,6 +71,7 @@
 
 import struct
 import numpy as np
+import pywt as wt
 from intercom import Intercom
 from intercom_empty import Intercom_empty
 

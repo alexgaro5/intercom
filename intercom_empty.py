@@ -22,6 +22,8 @@ class Intercom_empty(Intercom_DFC):
         Intercom_DFC.init(self, args)
         #We create a new variable to count the bitplanes that are empty.
         self.empty = 0
+        #We create a new variable to count the bitplanes that are empty in the previuos chunk.
+        self.previous_empty = 0
 
     def send_bitplane(self, indata, bitplane_number):
         bitplane = (indata[:, bitplane_number%self.number_of_channels] >> bitplane_number//self.number_of_channels) & 1
@@ -46,12 +48,14 @@ class Intercom_empty(Intercom_DFC):
         #We sum the bitplanes that are empty to the total of bitplanes thar are going to be send.
         self.NOBPTS += self.empty
 
-        if self.NOBPTS > self.max_NOBPTS:
+        #If number of bitplanes to send is greater than the maximum or the number of empty bitplane for each chunk is grater than 8, we skip the congestion calculation for the current chunk.
+        if (self.NOBPTS > self.max_NOBPTS) or (int(self.previous_empty//self.number_of_channels) > 8):
             self.NOBPTS = self.max_NOBPTS
 
+        #We save the number of empty bitplane to use it in the next chunk.
+        self.previous_empty = self.empty
         #We reset the variable.
         self.empty = 0
-
         last_BPTS = self.max_NOBPTS - self.NOBPTS - 1
         
         #We increase the empty counter if the bitplane is empty.
