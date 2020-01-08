@@ -43,10 +43,10 @@ class Intercom_empty(Intercom_DFC):
         magnitudes = abs(indata)
         indata = signs | magnitudes
         
+        #We calculate the average congestion
         self.NOBPTS = int(0.75*self.NOBPTS + 0.25*self.NORB)
+        #increase by one the number of bitplane to send the maximum if we dont have congestion.
         self.NOBPTS += 1
-        #We sum the bitplanes that are empty to the total of bitplanes thar are going to be send.
-        self.NOBPTS += self.empty
 
         #If number of bitplanes to send is greater than the maximum or the number of empty bitplane for each chunk is grater than 8, we skip the congestion calculation for the current chunk.
         if (self.NOBPTS > self.max_NOBPTS) or (int(self.previous_empty//self.number_of_channels) > 8):
@@ -56,6 +56,7 @@ class Intercom_empty(Intercom_DFC):
         self.previous_empty = self.empty
         #We reset the variable.
         self.empty = 0
+        #We calculaet the last bitplane to send index.
         last_BPTS = self.max_NOBPTS - self.NOBPTS - 1
         
         #We increase the empty counter if the bitplane is empty.
