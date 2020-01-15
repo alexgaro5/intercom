@@ -1,6 +1,8 @@
 {
   "ExpandedNodes": [
-    ""
+    "",
+    "\\test",
+    "\\test\\pywavelets"
   ],
   "SelectedNode": "\\intercom_dwt.py",
   "PreviewInSolutionExplorer": false
