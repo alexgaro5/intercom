@@ -75,14 +75,15 @@ import pywt
 from intercom import Intercom
 from intercom_empty import Intercom_empty
 
-
+#Para ejecutar y que vaya bien en Windows -s 8192 -cb 8
+#
 wavelet = 'db1'
-
+#
 padding = "per"
-
+#
 level = 4
-
-factor = 100
+#
+factor = 10
 
 if __debug__:
     import sys
@@ -91,44 +92,50 @@ class Intercom_DWT(Intercom_empty):
 
     def init(self, args):
         Intercom_empty.init(self, args)
-        self.skipped_bitplanes = [0]*self.cells_in_buffer
+        #
         self.max_NOBPTS = 32*self.number_of_channels
 
+        #
         zeros = np.zeros(self.frames_per_chunk)
         self.coeffs = pywt.wavedec(zeros, wavelet=wavelet, mode=padding, level=level)
-        _, self.coeff_slices = pywt.coeffs_to_array(self.coeffs)
+        temp, self.coeff_slices = pywt.coeffs_to_array(self.coeffs)
+
+        #
+        self.buffer_temp = np.zeros((len(temp), 2), dtype=np.int32)
+        self.buffer_coefs = [None]*self.cells_in_buffer
+
+        #
+        for i in range(self.cells_in_buffer):
+            self.buffer_coefs[i] = np.zeros((self.frames_per_chunk, 2), dtype=np.int32)
 
 
-    def send_bitplane(self, indata, bitplane_number):
-        bitplane = (indata[:, bitplane_number%self.number_of_channels] >> bitplane_number//self.number_of_channels) & 1
-        if np.any(bitplane): 
-            bitplane = bitplane.astype(np.uint8)
-            bitplane = np.packbits(bitplane)
-            message = struct.pack(self.packet_format, self.recorded_chunk_number, bitplane_number, self.received_bitplanes_per_chunk[(self.played_chunk_number+1) % self.cells_in_buffer]+1, *bitplane)
-            self.sending_sock.sendto(message, (self.destination_IP_addr, self.destination_port))
-        else:
-            self.skipped_bitplanes[self.recorded_chunk_number % self.cells_in_buffer] += 1
+    def receive_and_buffer(self):
+        message, source_address = self.receiving_sock.recvfrom(Intercom.MAX_MESSAGE_SIZE)
+        received_chunk_number, received_bitplane_number, self.NORB, *bitplane = struct.unpack(self.packet_format, message)
+        bitplane = np.asarray(bitplane, dtype=np.uint8)
+        bitplane = np.unpackbits(bitplane)
+        #
+        bitplane = bitplane.astype(np.int32)
+        self.buffer_coefs[received_chunk_number % self.cells_in_buffer][:, received_bitplane_number%self.number_of_channels] |= (bitplane << received_bitplane_number//self.number_of_channels)
+        self.received_bitplanes_per_chunk[received_chunk_number % self.cells_in_buffer] += 1
+        return received_chunk_number
 
 
     def send(self, indata):
-        print(indata)
-
         signs = indata & 0x8000
         magnitudes = abs(indata)
         indata = signs | magnitudes
 
-
+        #
         coeffs = pywt.wavedec(indata[:,1], wavelet=wavelet, mode=padding, level=level)
         coeffs_, slices = pywt.coeffs_to_array(coeffs)
         coeffs_ = np.multiply(coeffs_, factor)
-        indata[:,1] = coeffs_.astype(np.int16)
-
+        self.buffer_temp[:,1] = coeffs_.astype(np.int32)
+        #
         coeffs = pywt.wavedec(indata[:,0], wavelet=wavelet, mode=padding, level=level)
         coeffs_, slices = pywt.coeffs_to_array(coeffs)
         coeffs_ = np.multiply(coeffs_, factor)
-        indata[:,0] = coeffs_.astype(np.int16)
-
-        
+        self.buffer_temp[:,0] = coeffs_.astype(np.int32)
 
         self.NOBPTS = int(0.75*self.NOBPTS + 0.25*self.NORB)
         self.NOBPTS += self.skipped_bitplanes[(self.played_chunk_number+1) % self.cells_in_buffer]
@@ -136,36 +143,35 @@ class Intercom_DWT(Intercom_empty):
         self.NOBPTS += 1
         if self.NOBPTS > self.max_NOBPTS:
             self.NOBPTS = self.max_NOBPTS
-        last_BPTS = self.max_NOBPTS - self.NOBPTS - 1
 
+        #
         last_BPTS = - 1
-        #self.send_bitplane(indata, self.max_NOBPTS-1)
-        #self.send_bitplane(indata, self.max_NOBPTS-2)
-        #for bitplane_number in range(self.max_NOBPTS-3, last_BPTS, -1):
+
         for bitplane_number in range(self.max_NOBPTS-1, last_BPTS, -1):
-            self.send_bitplane(indata, bitplane_number)
+            self.send_bitplane(self.buffer_temp, bitplane_number)
         self.recorded_chunk_number = (self.recorded_chunk_number + 1) % self.MAX_CHUNK_NUMBER
 
     def record_send_and_play_stereo(self, indata, outdata, frames, time, status):
         indata[:,0] -= indata[:,1]
         self.send(indata)
-        chunk = self._buffer[self.played_chunk_number % self.cells_in_buffer]
-
+        #
+        chunk = self.buffer_coefs[self.played_chunk_number % self.cells_in_buffer]
+        #
+        self.buffer_coefs[self.played_chunk_number % self.cells_in_buffer] = np.zeros((self.frames_per_chunk, 2), dtype=np.int32)
+        #
         chunk = np.divide(chunk, factor)
 
+        #
         coeffs_from_arr = pywt.array_to_coeffs(chunk[:,1], self.coeff_slices, output_format="wavedec")
         sample = pywt.waverec(coeffs_from_arr, wavelet=wavelet, mode=padding)
-        #sample = pywt.waverec(self.coeffs, wavelet="db1", mode="per")
         chunk[:,1] = sample
-        chunk = chunk.astype(np.int16)
-
-
+        #
         coeffs_from_arr = pywt.array_to_coeffs(chunk[:,0], self.coeff_slices, output_format="wavedec")
         sample = pywt.waverec(coeffs_from_arr, wavelet=wavelet, mode=padding)
-        #sample = pywt.waverec(self.coeffs, wavelet="db1", mode="per")
         chunk[:,0] = sample
-        chunk = chunk.astype(np.int16)
 
+        #
+        chunk = chunk.astype(np.int16)
 
         signs = chunk >> 15
         magnitudes = chunk & 0x7FFF
@@ -173,10 +179,9 @@ class Intercom_DWT(Intercom_empty):
         chunk = magnitudes + magnitudes*signs*2
         self._buffer[self.played_chunk_number % self.cells_in_buffer]  = chunk
 
-
-
         self._buffer[self.played_chunk_number % self.cells_in_buffer][:,0] += self._buffer[self.played_chunk_number % self.cells_in_buffer][:,1]
         self.play(outdata)
+
         self.received_bitplanes_per_chunk [self.played_chunk_number % self.cells_in_buffer] = 0
         #print(*self.received_bitplanes_per_chunk)
 
