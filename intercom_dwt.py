@@ -75,14 +75,14 @@ import pywt
 from intercom import Intercom
 from intercom_empty import Intercom_empty
 
-#Para ejecutar y que vaya bien en Windows -s 8192 -cb 8
-#
-wavelet = 'db1'
-#
+#To run properly we should use the params -s 8192 -cb 8
+#Wavelet transform used, Daubechies 1
+wavelet = "db1"
+#Padding used, Periodization
 padding = "per"
-#
+#Levels of the transform
 level = 4
-#
+#Precision factor
 factor = 10
 
 if __debug__:
@@ -92,31 +92,31 @@ class Intercom_DWT(Intercom_empty):
 
     def init(self, args):
         Intercom_empty.init(self, args)
-        #
+
+        #We increase the number of bitplanes to send to 32 per channel
         self.max_NOBPTS = 32*self.number_of_channels
 
-        #
+        #We create the structure to store the coefficients
         zeros = np.zeros(self.frames_per_chunk)
         self.coeffs = pywt.wavedec(zeros, wavelet=wavelet, mode=padding, level=level)
-        temp, self.coeff_slices = pywt.coeffs_to_array(self.coeffs)
+        coeff_temp, self.coeff_slices = pywt.coeffs_to_array(self.coeffs)
 
-        #
-        self.buffer_temp = np.zeros((len(temp), 2), dtype=np.int32)
-        self.buffer_coefs = [None]*self.cells_in_buffer
+        #We create the buffers to store the coefficients in their correct format
+        self.buffer_send = np.zeros((len(coeff_temp), 2), dtype=np.int32)
 
-        #
+        self.buffer_coeffs = [None]*self.cells_in_buffer
         for i in range(self.cells_in_buffer):
-            self.buffer_coefs[i] = np.zeros((self.frames_per_chunk, 2), dtype=np.int32)
-
+            self.buffer_coeffs[i] = np.zeros((self.frames_per_chunk, 2), dtype=np.int32)
 
     def receive_and_buffer(self):
         message, source_address = self.receiving_sock.recvfrom(Intercom.MAX_MESSAGE_SIZE)
         received_chunk_number, received_bitplane_number, self.NORB, *bitplane = struct.unpack(self.packet_format, message)
         bitplane = np.asarray(bitplane, dtype=np.uint8)
         bitplane = np.unpackbits(bitplane)
-        #
+        #We change the format to int32
         bitplane = bitplane.astype(np.int32)
-        self.buffer_coefs[received_chunk_number % self.cells_in_buffer][:, received_bitplane_number%self.number_of_channels] |= (bitplane << received_bitplane_number//self.number_of_channels)
+        #We store the coefficients received in the buffer created to store them
+        self.buffer_coeffs[received_chunk_number % self.cells_in_buffer][:, received_bitplane_number%self.number_of_channels] |= (bitplane << received_bitplane_number//self.number_of_channels)
         self.received_bitplanes_per_chunk[received_chunk_number % self.cells_in_buffer] += 1
         return received_chunk_number
 
@@ -126,16 +126,14 @@ class Intercom_DWT(Intercom_empty):
         magnitudes = abs(indata)
         indata = signs | magnitudes
 
-        #
-        coeffs = pywt.wavedec(indata[:,1], wavelet=wavelet, mode=padding, level=level)
-        coeffs_, slices = pywt.coeffs_to_array(coeffs)
-        coeffs_ = np.multiply(coeffs_, factor)
-        self.buffer_temp[:,1] = coeffs_.astype(np.int32)
-        #
-        coeffs = pywt.wavedec(indata[:,0], wavelet=wavelet, mode=padding, level=level)
-        coeffs_, slices = pywt.coeffs_to_array(coeffs)
-        coeffs_ = np.multiply(coeffs_, factor)
-        self.buffer_temp[:,0] = coeffs_.astype(np.int32)
+        #For each channel, we make the discrete wavelet transform of the indata
+        for i in range(self.number_of_channels):
+            coeffs = pywt.wavedec(indata[:,i], wavelet=wavelet, mode=padding, level=level)
+            coeffs_, slices = pywt.coeffs_to_array(coeffs)
+            #We multiply the data by a specifiied factor
+            coeffs_ = np.multiply(coeffs_, factor)
+            #We store the coefficient array into the buffer
+            self.buffer_send[:,i] = coeffs_.astype(np.int32)
 
         self.NOBPTS = int(0.75*self.NOBPTS + 0.25*self.NORB)
         self.NOBPTS += self.skipped_bitplanes[(self.played_chunk_number+1) % self.cells_in_buffer]
@@ -143,34 +141,31 @@ class Intercom_DWT(Intercom_empty):
         self.NOBPTS += 1
         if self.NOBPTS > self.max_NOBPTS:
             self.NOBPTS = self.max_NOBPTS
-
-        #
         last_BPTS = - 1
 
         for bitplane_number in range(self.max_NOBPTS-1, last_BPTS, -1):
-            self.send_bitplane(self.buffer_temp, bitplane_number)
+            #We send the buffer with the coefficients instead of the indata
+            self.send_bitplane(self.buffer_send, bitplane_number)
         self.recorded_chunk_number = (self.recorded_chunk_number + 1) % self.MAX_CHUNK_NUMBER
 
     def record_send_and_play_stereo(self, indata, outdata, frames, time, status):
         indata[:,0] -= indata[:,1]
         self.send(indata)
-        #
-        chunk = self.buffer_coefs[self.played_chunk_number % self.cells_in_buffer]
-        #
-        self.buffer_coefs[self.played_chunk_number % self.cells_in_buffer] = np.zeros((self.frames_per_chunk, 2), dtype=np.int32)
-        #
+
+        #We get the chunk from the coefficients buffer
+        chunk = self.buffer_coeffs[self.played_chunk_number % self.cells_in_buffer]
+        #Once we get the chunk, we reset the buffer
+        self.buffer_coeffs[self.played_chunk_number % self.cells_in_buffer] = np.zeros((self.frames_per_chunk, 2), dtype=np.int32)
+        #We divide the data by the factor to restore it
         chunk = np.divide(chunk, factor)
 
-        #
-        coeffs_from_arr = pywt.array_to_coeffs(chunk[:,1], self.coeff_slices, output_format="wavedec")
-        sample = pywt.waverec(coeffs_from_arr, wavelet=wavelet, mode=padding)
-        chunk[:,1] = sample
-        #
-        coeffs_from_arr = pywt.array_to_coeffs(chunk[:,0], self.coeff_slices, output_format="wavedec")
-        sample = pywt.waverec(coeffs_from_arr, wavelet=wavelet, mode=padding)
-        chunk[:,0] = sample
+        #For each channel, we make the inverse discrete wavelet transform of the indata
+        for i in range(self.number_of_channels):
+            coeffs_from_arr = pywt.array_to_coeffs(chunk[:,i], self.coeff_slices, output_format="wavedec")
+            sample = pywt.waverec(coeffs_from_arr, wavelet=wavelet, mode=padding)
+            chunk[:,i] = sample
 
-        #
+        #We parse the chunk to int16 to play the data
         chunk = chunk.astype(np.int16)
 
         signs = chunk >> 15
